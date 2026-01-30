@@ -1,160 +1,49 @@
-import streamlit as st
 import json
-import random
 import re
-from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match, analyze_and_send_report
 
-# 1. Page Configuration
-st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
+def debug_calculus_json(file_path):
+    print(f"--- '{file_path}' 디버깅 시작 ---")
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_data = f.read()
 
-# 2. CSS: UI consistency
-st.markdown("""
-    <style>
-    div.stButton > button {
-        height: 60px;
-        font-size: 16px;
-        font-weight: bold;
-    }
-    </style>
-""", unsafe_allow_html=True)
+        # 1. 보이지 않는 특수 공백(Zero-width space, Non-breaking space) 확인
+        hidden_chars = re.findall(r'[\u00A0\u200b\u200c\u200d\ufeff]', raw_data)
+        if hidden_chars:
+            print(f"⚠️ 경고: {len(hidden_chars)}개의 보이지 않는 특수 문자가 발견되었습니다. 제거를 시도합니다.")
+            raw_data = re.sub(r'[\u00A0\u200b\u200c\u200d\ufeff]', ' ', raw_data)
 
-# 3. Initialize Session State
-if "page" not in st.session_state: st.session_state.page = "landing"
-if "user_name" not in st.session_state: st.session_state.user_name = None
-if "current_prob" not in st.session_state: st.session_state.current_prob = None
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
-if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = None
+        # 2. 잘못된 백슬래시(Single Backslash) 패턴 찾기
+        # JSON에서 허용되지 않는 백슬래시 조합(\l, \s, \f 등)을 찾습니다.
+        invalid_escapes = re.findall(r'\\(?![\\"/bfnrtu])', raw_data)
+        if invalid_escapes:
+            print(f"⚠️ 경고: {len(invalid_escapes)}개의 잘못된 백슬래시 이스케이프가 발견되었습니다.")
+            # 자동 교정: \ -> \\
+            raw_data = re.sub(r'\\(?![\\"/bfnrtu])', r'\\\\', raw_data)
 
-# 4. Load Calculus Problems
-PROBLEMS = load_problems()
-
-# --- Page 0: Login ---
-if st.session_state.user_name is None:
-    st.title("🧮 Calculus AI Tutor Portal")
-    st.subheader("Texas A&M University - Corpus Christi")
-    with st.form("login_form"):
-        name_input = st.text_input("Full Name")
-        if st.form_submit_button("Start Learning"):
-            if name_input.strip():
-                st.session_state.user_name = name_input.strip()
-                st.rerun()
-    st.stop()
-
-# --- Page 1: Landing (Category Selection) ---
-if st.session_state.page == "landing":
-    st.title(f"Welcome, {st.session_state.user_name}!")
-    st.info("Select a category to start practice or view a lecture.")
-    
-    # 5 Categories Selection
-    st.subheader("💡 Choose Your Focus Area")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    categories = [
-        ("Derivatives", "CAL_1"),
-        ("Integrals", "CAL_2"),
-        ("Partial Derivatives", "CAL_3"),
-        ("Vector Analysis", "CAL_4"),
-        ("Multiple Integrals", "CAL_5")
-    ]
-    
-    cols = [col1, col2, col3, col4, col5]
-    for i, (name, prefix) in enumerate(categories):
-        with cols[i]:
-            if st.button(f"📘 {name}", key=f"cat_{prefix}", use_container_width=True):
-                # 해당 카테고리 문제만 필터링 후 랜덤 선택
-                cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
-                st.session_state.current_prob = random.choice(cat_probs)
-                st.session_state.page = "chat"
-                st.rerun()
+        # 3. JSON 파싱 시도
+        try:
+            data = json.loads(raw_data)
+            print("✅ 결과: JSON 형식이 이제 완벽합니다!")
             
-            if st.button(f"🎓 Lecture", key=f"lec_{prefix}", use_container_width=True):
-                st.session_state.lecture_topic = name
-                st.session_state.page = "lecture"
-                st.rerun()
-
-# --- Page 2: Socratic Practice (Infinite Random Flow) ---
-elif st.session_state.page == "chat":
-    prob = st.session_state.current_prob
-    st.button("🏠 Home", on_click=lambda: setattr(st.session_state, 'page', 'landing'))
-    
-    st.title("📝 Problem Practice")
-    cols = st.columns([2, 1])
-    
-    with cols[0]:
-        st.subheader(prob['category'])
-        st.info(prob['statement'])
-        
-        # Chat interface
-        if "chat_session" not in st.session_state or st.session_state.current_prob['id'] != st.session_state.last_id:
-            sys_prompt = f"You are a Calculus Tutor at TAMUCC. Help {st.session_state.user_name} solve: {prob['statement']}. Socratic method only. Use LaTeX."
-            st.session_state.chat_model = get_gemini_model(sys_prompt)
-            st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-            st.session_state.last_id = prob['id']
-
-        for msg in st.session_state.chat_session.history:
-            with st.chat_message("assistant" if msg.role == "model" else "user"):
-                st.markdown(msg.parts[0].text)
-
-        if user_input := st.chat_input("Enter your answer or step..."):
-            # Check for numeric match
-            is_correct = False
-            for target, val in prob['targets'].items():
-                if check_numeric_match(user_input, val):
-                    is_correct = True
+            # 교정된 내용을 새 파일로 저장 (백업 후 덮어쓰기 권장)
+            with open('calculus_problems_fixed.json', 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            print("💾 교정된 파일이 'calculus_problems_fixed.json'으로 저장되었습니다.")
             
-            if is_correct:
-                st.success("Correct! Well done.")
-                if st.button("Next Random Problem ➡️"):
-                    # 같은 카테고리에서 다음 문제 랜덤 추출
-                    prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
-                    cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
-                    st.session_state.current_prob = random.choice(cat_probs)
-                    st.rerun()
-            else:
-                st.session_state.chat_session.send_message(user_input)
-                st.rerun()
+        except json.JSONDecodeError as e:
+            print(f"❌ 실패: 여전히 문법 오류가 존재합니다.")
+            print(f"📍 위치: {e.lineno}행 {e.colno}열")
+            # 에러 주변 텍스트 출력
+            lines = raw_data.split('\n')
+            start = max(0, e.lineno - 2)
+            end = min(len(lines), e.lineno + 1)
+            for i in range(start, end):
+                prefix = ">> " if i == e.lineno - 1 else "   "
+                print(f"{i+1}{prefix}{lines[i]}")
 
-    with cols[1]:
-        st.write("### Tutor Tools")
-        if st.button("Get a Hint"):
-            st.session_state.chat_session.send_message("Can you give me a small hint for the first step?")
-            st.rerun()
-        if st.button("New Problem (Skip)"):
-            prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
-            cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
-            st.session_state.current_prob = random.choice(cat_probs)
-            st.rerun()
+    except Exception as e:
+        print(f"❌ 파일 읽기 오류: {e}")
 
-# --- Page 3: Interactive Lecture ---
-elif st.session_state.page == "lecture":
-    topic = st.session_state.lecture_topic
-    st.title(f"🎓 Lecture: {topic}")
-    
-    col_content, col_tutor = st.columns([1, 1])
-    
-    with col_content:
-        # 개념 설명 렌더링 (Static 이미지 혹은 텍스트)
-        st.write(f"### Understanding {topic}")
-        st.markdown(f"In this module, we explore the fundamental principles of **{topic}** as required for the FE Exam.")
-        # 정역학처럼 시뮬레이션 이미지가 있다면 여기에 추가 (render_lecture_visual 함수 활용)
-        
-        if st.button("Back to Menu"):
-            st.session_state.page = "landing"
-            st.rerun()
-
-    with col_tutor:
-        st.subheader("💬 Ask Professor Um")
-        # 소크라테스식 대화 인터페이스 (Statics 코드와 동일 로직)
-        if "lec_session" not in st.session_state:
-            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Start with a question about the concept.")
-            st.session_state.lec_session = model.start_chat(history=[])
-        
-        for msg in st.session_state.lec_session.history:
-            with st.chat_message("assistant" if msg.role == "model" else "user"):
-                st.markdown(msg.parts[0].text)
-        
-        if lec_input := st.chat_input("Ask a question..."):
-            st.session_state.lec_session.send_message(lec_input)
-
-            st.rerun()
-
+if __name__ == "__main__":
+    debug_calculus_json('calculus_problems.json')
