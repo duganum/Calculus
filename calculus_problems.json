@@ -77,6 +77,13 @@
     "required_units": [""]
   },
   {
+    "id": "CAL_1_12",
+    "category": "Mathematics: Calculus - Derivatives",
+    "statement": "Find the derivative of $f(x) = \\cos^2(x)$ at $x = \\pi/4$.",
+    "targets": { "f'(\\pi/4)": -1.0 },
+    "required_units": [""]
+  },
+  {
     "id": "CAL_1_13",
     "category": "Mathematics: Calculus - Derivatives",
     "statement": "What is the second derivative $f''(x)$ of $f(x) = x^3 - 6x^2$ at $x = 3$?",
@@ -1043,4 +1050,3 @@
     "required_units": [""]
   }
 ]
-
