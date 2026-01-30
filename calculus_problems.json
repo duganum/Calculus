@@ -79,7 +79,7 @@
   {
     "id": "CAL_1_12",
     "category": "Mathematics: Calculus - Derivatives",
-    "statement": "Find the derivative of $f(x) = \cos^2(x)$ at $x = \\pi/4$.",
+    "statement": "Find the derivative of $f(x) = \\cos^2(x)$ at $x = \\pi/4$.",
     "targets": { "f'(\\pi/4)": -1.0 },
     "required_units": [""]
   },
@@ -1050,4 +1050,5 @@
     "required_units": [""]
   }
 ]
+
 
