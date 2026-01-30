@@ -142,7 +142,7 @@
   {
     "id": "CAL_1_21",
     "category": "Mathematics: Calculus - Derivatives",
-    "statement": "Evaluate $\\lim_{x \to 1} \\frac{\\ln(x)}{x - 1}$.",
+    "statement": "Evaluate $\\lim_{x \\to 1} \\frac{\\ln(x)}{x - 1}$.",
     "targets": { "Limit": 1.0 },
     "required_units": [""]
   },
@@ -184,7 +184,7 @@
   {
     "id": "CAL_1_27",
     "category": "Mathematics: Calculus - Derivatives",
-    "statement": "Evaluate $\\lim_{x \to 0} \\frac{\\tan(x)}{x}$.",
+    "statement": "Evaluate $\\lim_{x \\to 0} \\frac{\\tan(x)}{x}$.",
     "targets": { "Limit": 1.0 },
     "required_units": [""]
   },
@@ -1050,6 +1050,4 @@
     "required_units": [""]
   }
 ]
-
-
-
+"
