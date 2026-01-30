@@ -21,15 +21,16 @@ def get_gemini_model(system_instruction):
 
 @st.cache_data
 def load_problems():
-    """Calculus 문제 은행(JSON)을 로드합니다."""
+    """Calculus 문제 은행(JSON)을 로드하며 이스케이프 오류를 자동 교정합니다."""
     try:
         with open('calculus_problems.json', 'r', encoding='utf-8') as f:
-            # 파일 내용을 읽은 후 혹시 모를 잘못된 이스케이프 문자를 처리
             content = f.read()
+            # 정규표현식을 사용하여 잘못된 백슬래시(이스케이프)를 안전하게 두 번으로 바꿉니다.
+            # 특히 \l, \s, \f, \c 등 LaTeX 기호 앞에 백슬래시가 하나만 있는 경우를 대비합니다.
+            content = re.sub(r'\\(?![\\"/bfnrtu])', r'\\\\', content)
             return json.loads(content)
     except json.JSONDecodeError as e:
         st.error(f"JSON 문법 오류: {e.lineno}행 {e.colno}열 - {e.msg}")
-        # 오류가 난 지점의 텍스트를 일부 보여주어 수정을 돕습니다.
         return []
     except Exception as e:
         st.error(f"Problem bank load error: {e}")
@@ -132,4 +133,5 @@ def analyze_and_send_report(user_name, topic_title, chat_history):
     
 
     return report_text
+
 
