@@ -120,11 +120,36 @@ elif st.session_state.page == "chat":
             st.session_state.chat_session.send_message("Can you give me a small hint for the first step?")
             st.rerun()
         if st.button("New Problem (Skip)"):
+with cols[1]:
+        st.write("### Tutor Tools")
+        
+        # 힌트 버튼
+        if st.button("Get a Hint", use_container_width=True):
+            st.session_state.chat_session.send_message("Can you give me a small hint for the first step?")
+            st.rerun()
+            
+        # --- 수정된 New Problem (Skip) 버튼 로직 ---
+        if st.button("New Problem (Skip)", use_container_width=True):
+            # 1. 현재까지의 대화 내용 추출
+            history_text = "--- STUDENT SKIPPED PROBLEM ---\n"
+            if "chat_session" in st.session_state and st.session_state.chat_session.history:
+                for msg in st.session_state.chat_session.history:
+                    role = "Tutor" if msg.role == "model" else "Student"
+                    history_text += f"{role}: {msg.parts[0].text}\n"
+            
+            # 2. 교수님께 이메일 보고서 전송 (모니터링용)
+            with st.spinner("Reporting session to Dr. Um..."):
+                analyze_and_send_report(
+                    st.session_state.user_name, 
+                    f"SKIP REPORT: {prob['category']} ({prob['id']})", 
+                    history_text
+                )
+            
+            # 3. 새로운 랜덤 문제 선택 후 리런
             prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
             cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
             st.session_state.current_prob = random.choice(cat_probs)
             st.rerun()
-
 # --- Page 3: Interactive Lecture ---
 elif st.session_state.page == "lecture":
     topic = st.session_state.lecture_topic
@@ -157,3 +182,4 @@ elif st.session_state.page == "lecture":
             st.session_state.lec_session.send_message(lec_input)
 
             st.rerun()
+
