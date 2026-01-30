@@ -7,7 +7,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: UI consistency
+# 2. CSS: UI consistency & Button Height
 st.markdown("""
     <style>
     div.stButton > button {
@@ -22,31 +22,32 @@ st.markdown("""
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "user_name" not in st.session_state: st.session_state.user_name = None
 if "current_prob" not in st.session_state: st.session_state.current_prob = None
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
+if "last_id" not in st.session_state: st.session_state.last_id = None
 if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = None
 
-# 4. Load Calculus Problems
+# 4. Load Problems (Using the logic file function)
 PROBLEMS = load_problems()
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
     st.title("🧮 Calculus AI Tutor Portal")
-    st.subheader("Texas A&M University - Corpus Christi")
+    st.subheader("Texas A&M University - Corpus Christi | Dr. Dugan Um")
     with st.form("login_form"):
-        name_input = st.text_input("Full Name")
-        if st.form_submit_button("Start Learning"):
+        name_input = st.text_input("Full Name (Identification for academic monitoring)")
+        if st.form_submit_button("Access Tutor"):
             if name_input.strip():
                 st.session_state.user_name = name_input.strip()
                 st.rerun()
+            else:
+                st.warning("Identification is required for academic reporting.")
     st.stop()
 
-# --- Page 1: Landing (Category Selection) ---
+# --- Page 1: Main Menu ---
 if st.session_state.page == "landing":
     st.title(f"Welcome, {st.session_state.user_name}!")
-    st.info("Select a category to start practice or view a lecture.")
+    st.info("Select a category to start practice. Your progress is monitored for academic support.")
     
-    # 5 Categories Selection
-    st.subheader("💡 Choose Your Focus Area")
+    st.subheader("💡 Focus Areas")
     col1, col2, col3, col4, col5 = st.columns(5)
     
     categories = [
@@ -61,18 +62,18 @@ if st.session_state.page == "landing":
     for i, (name, prefix) in enumerate(categories):
         with cols[i]:
             if st.button(f"📘 {name}", key=f"cat_{prefix}", use_container_width=True):
-                # 해당 카테고리 문제만 필터링 후 랜덤 선택
                 cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
-                st.session_state.current_prob = random.choice(cat_probs)
-                st.session_state.page = "chat"
-                st.rerun()
+                if cat_probs:
+                    st.session_state.current_prob = random.choice(cat_probs)
+                    st.session_state.page = "chat"
+                    st.rerun()
             
             if st.button(f"🎓 Lecture", key=f"lec_{prefix}", use_container_width=True):
                 st.session_state.lecture_topic = name
                 st.session_state.page = "lecture"
                 st.rerun()
 
-# --- Page 2: Socratic Practice (Infinite Random Flow) ---
+# --- Page 2: Socratic Chat Practice ---
 elif st.session_state.page == "chat":
     prob = st.session_state.current_prob
     st.button("🏠 Home", on_click=lambda: setattr(st.session_state, 'page', 'landing'))
@@ -84,9 +85,13 @@ elif st.session_state.page == "chat":
         st.subheader(prob['category'])
         st.info(prob['statement'])
         
-        # Chat interface
-        if "chat_session" not in st.session_state or st.session_state.current_prob['id'] != st.session_state.last_id:
-            sys_prompt = f"You are a Calculus Tutor at TAMUCC. Help {st.session_state.user_name} solve: {prob['statement']}. Socratic method only. Use LaTeX."
+        # Initialize Chat Session
+        if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
+            sys_prompt = (
+                f"You are the Calculus Tutor for {st.session_state.user_name} at TAMUCC. "
+                f"Solve: {prob['statement']}. Socratic method only. Use LaTeX. "
+                "Ask one targeted question at a time. Do not give the final answer immediately."
+            )
             st.session_state.chat_model = get_gemini_model(sys_prompt)
             st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
             st.session_state.last_id = prob['id']
@@ -103,9 +108,15 @@ elif st.session_state.page == "chat":
                     is_correct = True
             
             if is_correct:
-                st.success("Correct! Well done.")
+                st.success("Correct! Excellent logic.")
+                # 자동 리포트 전송 (정답 달성 시)
+                history_text = "--- COMPLETED SUCCESSFULLY ---\n"
+                for msg in st.session_state.chat_session.history:
+                    role = "Tutor" if msg.role == "model" else "Student"
+                    history_text += f"{role}: {msg.parts[0].text}\n"
+                analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
+                
                 if st.button("Next Random Problem ➡️"):
-                    # 같은 카테고리에서 다음 문제 랜덤 추출
                     prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
                     cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
                     st.session_state.current_prob = random.choice(cat_probs)
@@ -116,70 +127,49 @@ elif st.session_state.page == "chat":
 
     with cols[1]:
         st.write("### Tutor Tools")
-        if st.button("Get a Hint"):
-            st.session_state.chat_session.send_message("Can you give me a small hint for the first step?")
-            st.rerun()
-        if st.button("New Problem (Skip)"):
-with cols[1]:
-        st.write("### Tutor Tools")
-        
-        # 힌트 버튼
         if st.button("Get a Hint", use_container_width=True):
-            st.session_state.chat_session.send_message("Can you give me a small hint for the first step?")
+            st.session_state.chat_session.send_message("I'm stuck. Can you guide me to the next step?")
             st.rerun()
             
-        # --- 수정된 New Problem (Skip) 버튼 로직 ---
+        # 모니터링 기능이 포함된 Skip 버튼
         if st.button("New Problem (Skip)", use_container_width=True):
-            # 1. 현재까지의 대화 내용 추출
             history_text = "--- STUDENT SKIPPED PROBLEM ---\n"
-            if "chat_session" in st.session_state and st.session_state.chat_session.history:
+            if "chat_session" in st.session_state:
                 for msg in st.session_state.chat_session.history:
                     role = "Tutor" if msg.role == "model" else "Student"
                     history_text += f"{role}: {msg.parts[0].text}\n"
             
-            # 2. 교수님께 이메일 보고서 전송 (모니터링용)
-            with st.spinner("Reporting session to Dr. Um..."):
-                analyze_and_send_report(
-                    st.session_state.user_name, 
-                    f"SKIP REPORT: {prob['category']} ({prob['id']})", 
-                    history_text
-                )
+            # Skip 리포트 전송
+            with st.spinner("Recording session traffic..."):
+                analyze_and_send_report(st.session_state.user_name, f"SKIP REPORT: {prob['id']}", history_text)
             
-            # 3. 새로운 랜덤 문제 선택 후 리런
+            # 다음 문제로 이동
             prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
             cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
             st.session_state.current_prob = random.choice(cat_probs)
             st.rerun()
+
 # --- Page 3: Interactive Lecture ---
 elif st.session_state.page == "lecture":
     topic = st.session_state.lecture_topic
     st.title(f"🎓 Lecture: {topic}")
-    
     col_content, col_tutor = st.columns([1, 1])
     
     with col_content:
-        # 개념 설명 렌더링 (Static 이미지 혹은 텍스트)
-        st.write(f"### Understanding {topic}")
-        st.markdown(f"In this module, we explore the fundamental principles of **{topic}** as required for the FE Exam.")
-        # 정역학처럼 시뮬레이션 이미지가 있다면 여기에 추가 (render_lecture_visual 함수 활용)
-        
-        if st.button("Back to Menu"):
-            st.session_state.page = "landing"
-            st.rerun()
+        st.write(f"### Fundamental Concepts of {topic}")
+        st.info("Review the core theorems and formulas below before starting practice.")
+        if st.button("Back to Menu", use_container_width=True):
+            st.session_state.page = "landing"; st.rerun()
 
     with col_tutor:
-        st.subheader("💬 Ask Professor Um")
-        # 소크라테스식 대화 인터페이스 (Statics 코드와 동일 로직)
+        st.subheader("💬 Conceptual Discussion")
         if "lec_session" not in st.session_state:
-            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Start with a question about the concept.")
+            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Start with a Socratic question.")
             st.session_state.lec_session = model.start_chat(history=[])
         
         for msg in st.session_state.lec_session.history:
             with st.chat_message("assistant" if msg.role == "model" else "user"):
                 st.markdown(msg.parts[0].text)
         
-        if lec_input := st.chat_input("Ask a question..."):
-            st.session_state.lec_session.send_message(lec_input)
-
-            st.rerun()
-
+        if lec_input := st.chat_input("Ask about the concept..."):
+            st.session_state.lec_session.send_message(lec_input); st.rerun()
