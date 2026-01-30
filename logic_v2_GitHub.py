@@ -21,21 +21,35 @@ def get_gemini_model(system_instruction):
 
 @st.cache_data
 def load_problems():
-    """Calculus 문제 은행(JSON)을 로드하며 이스케이프 오류를 자동 교정합니다."""
+    """문제를 로드하고 에러 발생 시 화면에 상세 내용을 표시합니다."""
+    file_path = 'calculus_problems.json'
     try:
-        with open('calculus_problems.json', 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            # 정규표현식을 사용하여 잘못된 백슬래시(이스케이프)를 안전하게 두 번으로 바꿉니다.
-            # 특히 \l, \s, \f, \c 등 LaTeX 기호 앞에 백슬래시가 하나만 있는 경우를 대비합니다.
-            content = re.sub(r'\\(?![\\"/bfnrtu])', r'\\\\', content)
-            return json.loads(content)
-    except json.JSONDecodeError as e:
-        st.error(f"JSON 문법 오류: {e.lineno}행 {e.colno}열 - {e.msg}")
+            
+            # 1. 보이지 않는 특수 공백 제거
+            content = content.replace('\u00A0', ' ')
+            
+            # 2. JSON 파싱 시도
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError as e:
+                # 에러가 난 줄의 텍스트를 추출하여 화면에 표시
+                lines = content.split('\n')
+                error_line = lines[e.lineno - 1] if e.lineno <= len(lines) else "N/A"
+                
+                st.error(f"❌ JSON 문법 오류 발견!")
+                st.warning(f"위치: {e.lineno}행 {e.colno}열")
+                st.code(f"문제의 행: {error_line}", language="json")
+                st.info("💡 팁: LaTeX 수식의 백슬래시가 하나(\\)만 있는지 확인하고 두 개(\\\\)로 고쳐보세요.")
+                return []
+                
+    except FileNotFoundError:
+        st.error(f"파일을 찾을 수 없습니다: {file_path}")
         return []
     except Exception as e:
-        st.error(f"Problem bank load error: {e}")
+        st.error(f"예상치 못한 오류 발생: {e}")
         return []
-
 def check_numeric_match(user_val, correct_val, tolerance=0.05):
     """숫자를 추출하여 5% 오차 범위 내에 있는지 확인합니다."""
     try:
@@ -133,5 +147,6 @@ def analyze_and_send_report(user_name, topic_title, chat_history):
     
 
     return report_text
+
 
 
