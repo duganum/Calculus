@@ -26,7 +26,7 @@ if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = None
 
 # 4. Load Calculus Problems
-PROBLEMS = load_calculus_data()
+PROBLEMS = load_problems()
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
@@ -157,3 +157,4 @@ elif st.session_state.page == "lecture":
             st.session_state.lec_session.send_message(lec_input)
 
             st.rerun()
+
