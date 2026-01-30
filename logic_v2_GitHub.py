@@ -19,11 +19,11 @@ def get_gemini_model(system_instruction):
         st.error(f"Gemini Initialization Failed: {e}")
         return None
 
+@st.cache_data
 def load_problems():
     """Calculus 문제 은행(JSON)을 로드합니다."""
     try:
-        # 파일명을 교수님이 저장하신 이름으로 확인해 주세요.
-        with open('calculus_problems.json', 'r') as f:
+        with open('calculus_problems.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         st.error(f"Problem bank load error: {e}")
@@ -124,4 +124,5 @@ def analyze_and_send_report(user_name, topic_title, chat_history):
     except Exception as e:
         print(f"SMTP Error: {e}")
     
+
     return report_text
