@@ -26,12 +26,6 @@ if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = None
 
 # 4. Load Calculus Problems
-@st.cache_data
-def load_calculus_data():
-    # 이전에 생성한 150문제 JSON 파일 로드
-    with open('calculus_problems.json', 'r') as f:
-        return json.load(f)
-
 PROBLEMS = load_calculus_data()
 
 # --- Page 0: Login ---
@@ -161,4 +155,5 @@ elif st.session_state.page == "lecture":
         
         if lec_input := st.chat_input("Ask a question..."):
             st.session_state.lec_session.send_message(lec_input)
+
             st.rerun()
