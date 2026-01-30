@@ -1048,5 +1048,6 @@
     "statement": "Find the volume of the region bounded by $z=x^2+y^2$ and the plane $z=1$. Use $\\pi = 3.142$.",
     "targets": { "Volume": 1.571 },
     "required_units": [""]
-  },
+  }
 ]
+
