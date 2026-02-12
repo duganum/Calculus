@@ -8,7 +8,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: Professional UI & LaTeX formatting
+# 2. CSS: Professional UI & Fix for the "Sliced" Badge
 st.markdown("""
     <style>
     div.stButton > button {
@@ -17,16 +17,25 @@ st.markdown("""
         font-weight: bold;
     }
     .status-badge {
-        padding: 5px 15px;
+        padding: 8px 16px;
         border-radius: 20px;
         font-size: 14px;
         font-weight: bold;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         border: 1px solid rgba(0,0,0,0.1);
-        margin-bottom: 10px;
+        margin-bottom: 20px;
+        margin-top: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     /* Scannable layout adjustments */
     .block-container { padding-top: 2rem; }
+    
+    /* Ensure title has clear spacing from elements above */
+    h1 {
+        margin-top: 10px !important;
+        padding-top: 0px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -51,10 +60,12 @@ def get_text(msg):
     return msg.get('parts')[0].get('text')
 
 def draw_status():
+    # Wrap in a container to ensure consistent spacing
+    status_container = st.container()
     if st.session_state.api_busy:
-        st.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is reflecting...</div>', unsafe_allow_html=True)
+        status_container.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is reflecting...</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Professor is Ready</div>', unsafe_allow_html=True)
+        status_container.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Professor is Ready</div>', unsafe_allow_html=True)
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
@@ -74,7 +85,13 @@ if st.session_state.page == "landing":
     st.info("Select a focus area to begin your Socratic practice.")
     
     col1, col2, col3, col4, col5 = st.columns(5)
-    categories = [("Derivatives", "CAL_1"), ("Integrals", "CAL_2"), ("Partial Derivatives", "CAL_3"), ("Vector Analysis", "CAL_4"), ("Multiple Integrals", "CAL_5")]
+    categories = [
+        ("Derivatives", "CAL_1"), 
+        ("Integrals", "CAL_2"), 
+        ("Partial Derivatives", "CAL_3"), 
+        ("Vector Analysis", "CAL_4"), 
+        ("Multiple Integrals", "CAL_5")
+    ]
     
     for i, (name, prefix) in enumerate(categories):
         with [col1, col2, col3, col4, col5][i]:
@@ -83,14 +100,16 @@ if st.session_state.page == "landing":
                 if cat_probs:
                     st.session_state.current_prob = random.choice(cat_probs)
                     st.session_state.hint_history = []
-                    st.session_state.page = "chat"; st.rerun()
+                    st.session_state.page = "chat"
+                    st.rerun()
 
 # --- Page 2: Socratic Chat ---
 elif st.session_state.page == "chat":
     draw_status()
     prob = st.session_state.current_prob
     if st.button("🏠 Home"):
-        st.session_state.page = "landing"; st.rerun()
+        st.session_state.page = "landing"
+        st.rerun()
     
     st.title("📝 Problem Practice")
     cols = st.columns([1.5, 1])
@@ -136,7 +155,6 @@ elif st.session_state.page == "chat":
         
         if h_input := st.chat_input("Ask for a rule or equation", key="hint_input"):
             st.session_state.hint_history.append({"role": "user", "text": h_input})
-            # Force the hint model to use proper LaTeX and avoid HTML tags
             hint_instruction = (
                 "Provide a concise math hint. Use ONLY LaTeX for formulas. "
                 "Example: Use $\\sec^2(x)$ instead of HTML tags. "
