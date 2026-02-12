@@ -39,6 +39,18 @@ if "api_busy" not in st.session_state: st.session_state.api_busy = False
 # 4. Load Problems
 PROBLEMS = load_problems()
 
+# --- Helper Logic: Safe History Parsing ---
+def get_role(msg):
+    """Safely extract role from either object or dict."""
+    role = msg.role if hasattr(msg, 'role') else msg.get('role')
+    return "assistant" if role == "model" else "user"
+
+def get_text(msg):
+    """Safely extract text from either object or dict."""
+    if hasattr(msg, 'parts'):
+        return msg.parts[0].text
+    return msg.get('parts')[0].get('text')
+
 # --- Helper: Activity Indicator ---
 def draw_status():
     if st.session_state.api_busy:
@@ -106,15 +118,15 @@ elif st.session_state.page == "chat":
                           f"Solve: {prob['statement']}. Socratic method only. Use LaTeX.")
             st.session_state.chat_model = get_gemini_model(sys_prompt)
             st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-            # Manual append to start the conversation without "self-talking"
+            # Manual append to start the conversation safely
             start_msg = f"Hello {st.session_state.user_name}. To begin, how would you approach the first derivative/integral of this function?"
             st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
             st.session_state.last_id = prob['id']
 
+        # Loop through history using safe helpers
         for msg in st.session_state.chat_session.history:
-            role = "assistant" if msg.role == "model" else "user"
-            with st.chat_message(role):
-                st.markdown(msg.parts[0].text)
+            with st.chat_message(get_role(msg)):
+                st.markdown(get_text(msg))
 
         if user_input := st.chat_input("Enter your answer or step..."):
             st.session_state.api_busy = True
@@ -122,7 +134,7 @@ elif st.session_state.page == "chat":
             
             if is_correct:
                 st.success("Correct! Excellent logic.")
-                history_text = "".join([f"{'Tutor' if m.role == 'model' else 'Student'}: {m.parts[0].text}\n" for m in st.session_state.chat_session.history])
+                history_text = "".join([f"{'Tutor' if get_role(m)=='assistant' else 'Student'}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
                 analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
                 st.session_state.api_busy = False
                 if st.button("Next Problem ➡️"): st.rerun()
@@ -133,7 +145,7 @@ elif st.session_state.page == "chat":
                     st.session_state.api_busy = False
                     st.rerun()
                 except Exception as e:
-                    st.error("The Professor is currently overwhelmed with students. Please wait 10 seconds.")
+                    st.error("Rate limit reached. Please wait 10 seconds.")
                     time.sleep(2)
                     st.session_state.api_busy = False
 
@@ -144,7 +156,7 @@ elif st.session_state.page == "chat":
                 st.session_state.chat_session.send_message("I'm stuck. Can you guide me to the next step?")
                 st.rerun()
             except:
-                st.warning("Rate limit reached. Please wait a moment.")
+                st.warning("Rate limit reached. Please wait.")
 
 # --- Page 3: Interactive Lecture ---
 elif st.session_state.page == "lecture":
@@ -155,25 +167,25 @@ elif st.session_state.page == "lecture":
     
     with col_content:
         st.write(f"### Fundamental Concepts of {topic}")
-        st.info("Review the formulas below. Ask the Professor to explain specific steps.")
+        st.info("Ask the Professor to explain specific steps or conceptual origins.")
         if st.button("Back to Menu", use_container_width=True):
             st.session_state.page = "landing"; st.rerun()
 
     with col_tutor:
         st.subheader("💬 Conceptual Discussion")
         if "lec_session" not in st.session_state:
-            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Use Socratic Method. Keep responses concise.")
+            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Use Socratic Method.")
             st.session_state.lec_session = model.start_chat(history=[])
             st.session_state.lec_session.history.append({"role": "model", "parts": [{"text": f"Hello {st.session_state.user_name}. What is your current understanding of {topic}?"}]})
         
+        # Loop through lecture history using safe helpers
         for msg in st.session_state.lec_session.history:
-            role = "assistant" if msg.role == "model" else "user"
-            with st.chat_message(role):
-                st.markdown(msg.parts[0].text)
+            with st.chat_message(get_role(msg)):
+                st.markdown(get_text(msg))
         
         if lec_input := st.chat_input("Ask about the concept..."):
             try:
                 st.session_state.lec_session.send_message(lec_input)
                 st.rerun()
             except:
-                st.error("Professor Um is currently in a meeting (Rate Limit). Try again in a few seconds.")
+                st.error("Rate limit reached. Try again in a few seconds.")
