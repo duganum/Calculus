@@ -41,12 +41,10 @@ PROBLEMS = load_problems()
 
 # --- Helper Logic: Safe History Parsing ---
 def get_role(msg):
-    """Safely extract role from either object or dict."""
     role = msg.role if hasattr(msg, 'role') else msg.get('role')
     return "assistant" if role == "model" else "user"
 
 def get_text(msg):
-    """Safely extract text from either object or dict."""
     if hasattr(msg, 'parts'):
         return msg.parts[0].text
     return msg.get('parts')[0].get('text')
@@ -54,9 +52,9 @@ def get_text(msg):
 # --- Helper: Activity Indicator ---
 def draw_status():
     if st.session_state.api_busy:
-        st.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Processing...</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is reflecting...</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Ready</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Professor is Ready</div>', unsafe_allow_html=True)
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
@@ -103,8 +101,7 @@ elif st.session_state.page == "chat":
     draw_status()
     prob = st.session_state.current_prob
     if st.button("🏠 Home"):
-        st.session_state.page = "landing"
-        st.rerun()
+        st.session_state.page = "landing"; st.rerun()
     
     st.title("📝 Problem Practice")
     cols = st.columns([2, 1])
@@ -127,6 +124,7 @@ elif st.session_state.page == "chat":
             with st.chat_message(get_role(msg)):
                 st.markdown(get_text(msg))
 
+        # Handle Chat Input
         if user_input := st.chat_input("Enter your answer or step..."):
             st.session_state.api_busy = True
             is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
@@ -136,18 +134,23 @@ elif st.session_state.page == "chat":
                 history_text = "".join([f"{'Tutor' if get_role(m)=='assistant' else 'Student'}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
                 analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
                 st.session_state.api_busy = False
-                # User manually clicks home or next problem
             else:
-                # RAW CALL - NO ERROR HANDLING
                 st.session_state.chat_session.send_message(user_input)
                 st.session_state.api_busy = False
                 st.rerun()
 
     with cols[1]:
         st.write("### Tutor Tools")
-        if st.button("Get a Hint", use_container_width=True):
-            # RAW CALL - NO ERROR HANDLING
-            st.session_state.chat_session.send_message("I'm stuck. Can you guide me to the next step?")
+        # Revised Hint Logic: Now works by adding to chat history
+        if st.button("💡 Get a Hint", use_container_width=True):
+            with st.spinner("Professor is reflecting on a hint..."):
+                st.session_state.chat_session.send_message("I am a bit stuck. Could you give me a small hint for the next step?")
+            st.rerun()
+            
+        if st.button("⏭️ New Problem", use_container_width=True):
+            prefix = prob['id'].split('_')[0]
+            cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
+            st.session_state.current_prob = random.choice(cat_probs)
             st.rerun()
 
 # --- Page 3: Interactive Lecture ---
@@ -159,23 +162,21 @@ elif st.session_state.page == "lecture":
     
     with col_content:
         st.write(f"### Fundamental Concepts of {topic}")
-        st.info("Review conceptual origins. Ask the Professor for clarification.")
+        st.info("Review the concepts on the right with the Professor.")
         if st.button("Back to Menu", use_container_width=True):
             st.session_state.page = "landing"; st.rerun()
 
     with col_tutor:
         st.subheader("💬 Conceptual Discussion")
         if "lec_session" not in st.session_state:
-            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Use Socratic Method.")
+            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Socratic method.")
             st.session_state.lec_session = model.start_chat(history=[])
             st.session_state.lec_session.history.append({"role": "model", "parts": [{"text": f"Hello {st.session_state.user_name}. What is your current understanding of {topic}?"}]})
         
-        # Rendering History
         for msg in st.session_state.lec_session.history:
             with st.chat_message(get_role(msg)):
                 st.markdown(get_text(msg))
         
         if lec_input := st.chat_input("Ask about the concept..."):
-            # RAW CALL - NO ERROR HANDLING
             st.session_state.lec_session.send_message(lec_input)
             st.rerun()
