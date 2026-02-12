@@ -45,7 +45,6 @@ if "user_name" not in st.session_state: st.session_state.user_name = None
 if "current_prob" not in st.session_state: st.session_state.current_prob = None
 if "last_id" not in st.session_state: st.session_state.last_id = None
 if "api_busy" not in st.session_state: st.session_state.api_busy = False
-if "hint_history" not in st.session_state: st.session_state.hint_history = []
 
 PROBLEMS = load_problems()
 
@@ -60,7 +59,6 @@ def get_text(msg):
     return msg.get('parts')[0].get('text')
 
 def draw_status():
-    # Wrap in a container to ensure consistent spacing
     status_container = st.container()
     if st.session_state.api_busy:
         status_container.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is reflecting...</div>', unsafe_allow_html=True)
@@ -99,7 +97,6 @@ if st.session_state.page == "landing":
                 cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
                 if cat_probs:
                     st.session_state.current_prob = random.choice(cat_probs)
-                    st.session_state.hint_history = []
                     st.session_state.page = "chat"
                     st.rerun()
 
@@ -107,66 +104,55 @@ if st.session_state.page == "landing":
 elif st.session_state.page == "chat":
     draw_status()
     prob = st.session_state.current_prob
-    if st.button("🏠 Home"):
-        st.session_state.page = "landing"
+    
+    header_col1, header_col2 = st.columns([0.8, 0.2])
+    with header_col1:
+        st.title("📝 Problem Practice")
+    with header_col2:
+        if st.button("🏠 Home", use_container_width=True):
+            st.session_state.page = "landing"
+            st.rerun()
+    
+    st.markdown("### Current Problem")
+    st.info(prob['statement'])
+    
+    if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
+        sys_prompt = f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. Only one targeted question at a time. ALWAYS use LaTeX for math (e.g., $x^2$). If the user asks for a hint, provide a small conceptual nudge using LaTeX."
+        st.session_state.chat_model = get_gemini_model(sys_prompt)
+        st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
+        start_msg = f"Hello {st.session_state.user_name}. Looking at this expression, what would be our first step?"
+        st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
+        st.session_state.last_id = prob['id']
+
+    # Chat history display
+    chat_box = st.container(height=500)
+    with chat_box:
+        for msg in st.session_state.chat_session.history:
+            with st.chat_message(get_role(msg)):
+                st.markdown(get_text(msg))
+
+    # User Input Logic
+    if user_input := st.chat_input("Enter your step or ask for a hint..."):
+        st.session_state.api_busy = True
+        
+        # Check if user input matches target numerical answers
+        is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
+        
+        if is_correct:
+            st.success("Correct! Excellent logic.")
+            # Record final history and report
+            history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
+            analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
+            # Send message to model to congratulate/wrap up
+            st.session_state.chat_session.send_message(f"I found the correct answer: {user_input}. Please congratulate me and offer a brief summary.")
+        else:
+            # Normal Socratic interaction
+            st.session_state.chat_session.send_message(user_input)
+            
+        st.session_state.api_busy = False
         st.rerun()
-    
-    st.title("📝 Problem Practice")
-    cols = st.columns([1.5, 1])
-    
-    with cols[0]:
-        st.markdown("### Current Problem")
-        st.info(prob['statement'])
-        
-        if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
-            sys_prompt = f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. Only one targeted question at a time. ALWAYS use LaTeX for math (e.g., $x^2$)."
-            st.session_state.chat_model = get_gemini_model(sys_prompt)
-            st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-            start_msg = f"Hello {st.session_state.user_name}. Looking at this expression, what would be our first step in finding the derivative?"
-            st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
-            st.session_state.last_id = prob['id']
 
-        chat_box = st.container(height=400)
-        with chat_box:
-            for msg in st.session_state.chat_session.history:
-                with st.chat_message(get_role(msg)):
-                    st.markdown(get_text(msg))
-
-        if user_input := st.chat_input("Enter your step..."):
-            st.session_state.api_busy = True
-            if any(check_numeric_match(user_input, val) for val in prob['targets'].values()):
-                st.success("Correct! Excellent logic.")
-                history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
-                analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
-            else:
-                st.session_state.chat_session.send_message(user_input)
-            st.session_state.api_busy = False
-            st.rerun()
-
-    with cols[1]:
-        st.write("### 💡 Hint Mini-Chat")
-        hint_display = st.container(height=300, border=True)
-        with hint_display:
-            if not st.session_state.hint_history:
-                st.caption("Need a specific derivative rule? Ask here.")
-            for hint in st.session_state.hint_history:
-                with st.chat_message("assistant" if hint['role'] == "model" else "user"):
-                    st.markdown(hint['text'])
-        
-        if h_input := st.chat_input("Ask for a rule or equation", key="hint_input"):
-            st.session_state.hint_history.append({"role": "user", "text": h_input})
-            hint_instruction = (
-                "Provide a concise math hint. Use ONLY LaTeX for formulas. "
-                "Example: Use $\\sec^2(x)$ instead of HTML tags. "
-                "Reference these if relevant: "
-                "$\\frac{d}{dx}[\\sin(x)] = \\cos(x)$, $\\frac{d}{dx}[\\tan(x)] = \\sec^2(x)$."
-            )
-            hint_model = get_gemini_model(hint_instruction)
-            response = hint_model.generate_content(h_input)
-            st.session_state.hint_history.append({"role": "model", "text": response.text})
-            st.rerun()
-
-        st.markdown("---")
-        if st.button("⏭️ Next Problem", use_container_width=True):
-            st.session_state.last_id = None
-            st.rerun()
+    st.markdown("---")
+    if st.button("⏭️ Next Problem"):
+        st.session_state.last_id = None
+        st.rerun()
