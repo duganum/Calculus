@@ -32,6 +32,10 @@ st.markdown("""
         margin-top: 10px;
         margin-bottom: 10px;
     }
+    /* Remove default pinning margins for inline chat_input */
+    .stChatInput {
+        padding-bottom: 20px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -92,7 +96,6 @@ if st.session_state.page == "landing":
 elif st.session_state.page == "chat":
     prob = st.session_state.current_prob
     
-    # Header layout with proper alignment
     header_col1, header_col2 = st.columns([0.8, 0.2])
     with header_col1:
         st.title("📝 Problem Practice")
@@ -118,33 +121,35 @@ elif st.session_state.page == "chat":
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
-    # Chat history display - height 400 for compact visibility
-    chat_box = st.container(height=400)
-    with chat_box:
-        for msg in st.session_state.chat_session.history:
-            text = get_text(msg)
-            if "HIDDEN_INSTRUCTION" not in text:
-                with st.chat_message(get_role(msg)):
-                    st.markdown(text)
+    # Chat history display & Input aligned in the same parent container
+    chat_container = st.container()
+    with chat_container:
+        chat_box = st.container(height=400)
+        with chat_box:
+            for msg in st.session_state.chat_session.history:
+                text = get_text(msg)
+                if "HIDDEN_INSTRUCTION" not in text:
+                    with st.chat_message(get_role(msg)):
+                        st.markdown(text)
 
-    # User Input Logic
-    if user_input := st.chat_input("Enter your step..."):
-        st.session_state.api_busy = True
-        
-        is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
-        
-        if is_correct:
-            st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
-            hidden_prompt = f"HIDDEN_INSTRUCTION: The user is correct. Their answer was {user_input}. Congratulate them and provide a brief step-by-step summary."
-            st.session_state.chat_session.send_message(hidden_prompt)
+        # Placing chat_input here (inside the container) aligns its width with the container above
+        if user_input := st.chat_input("Enter your step..."):
+            st.session_state.api_busy = True
             
-            history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
-            analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
-        else:
-            st.session_state.chat_session.send_message(user_input)
+            is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
             
-        st.session_state.api_busy = False
-        st.rerun()
+            if is_correct:
+                st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
+                hidden_prompt = f"HIDDEN_INSTRUCTION: The user is correct. Their answer was {user_input}. Congratulate them and provide a brief step-by-step summary."
+                st.session_state.chat_session.send_message(hidden_prompt)
+                
+                history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
+                analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
+            else:
+                st.session_state.chat_session.send_message(user_input)
+                
+            st.session_state.api_busy = False
+            st.rerun()
 
     st.markdown("---")
     if st.button("⏭️ Next Problem", use_container_width=False):
