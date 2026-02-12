@@ -8,7 +8,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: Professional UI & Fix for the "Sliced" Badge
+# 2. CSS: Professional UI, Fix for the "Sliced" Badge, and Layout Constraints
 st.markdown("""
     <style>
     div.stButton > button {
@@ -24,14 +24,18 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         border: 1px solid rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-        margin-top: 10px;
+        margin-bottom: 15px;
+        margin-top: 5px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .block-container { padding-top: 2rem; }
+    .block-container { 
+        padding-top: 1.5rem; 
+        max-width: 1000px; /* Constraints width for better readability on wide screens */
+    }
     h1 {
-        margin-top: 10px !important;
+        margin-top: 5px !important;
         padding-top: 0px !important;
+        font-size: 2rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -114,7 +118,6 @@ elif st.session_state.page == "chat":
     st.info(prob['statement'])
     
     if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
-        # Updated system prompt to strictly guide the model
         sys_prompt = (
             f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. "
             "Ask ONLY one targeted question at a time to lead the student. "
@@ -128,12 +131,12 @@ elif st.session_state.page == "chat":
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
-    # Chat history display
-    chat_box = st.container(height=500)
+    # Chat history display - Reduced by 20% (500 -> 400)
+    chat_box = st.container(height=400)
     with chat_box:
         for msg in st.session_state.chat_session.history:
-            # We skip internal hidden instructions to prevent "AI talking to itself"
             text = get_text(msg)
+            # Logic to keep internal AI instructions hidden from user UI
             if "HIDDEN_INSTRUCTION" not in text:
                 with st.chat_message(get_role(msg)):
                     st.markdown(text)
@@ -142,28 +145,24 @@ elif st.session_state.page == "chat":
     if user_input := st.chat_input("Enter your step..."):
         st.session_state.api_busy = True
         
-        # Check if user input matches target numerical answers
         is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
         
         if is_correct:
-            # 1. Add the user's actual text to history
+            # 1. Store user's final answer
             st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
-            
-            # 2. Send a hidden instruction for the summary without displaying it in the UI
+            # 2. Trigger hidden summary request
             hidden_prompt = f"HIDDEN_INSTRUCTION: The user is correct. Their answer was {user_input}. Congratulate them and provide a brief step-by-step summary."
             st.session_state.chat_session.send_message(hidden_prompt)
-            
-            # 3. Finalize reporting
+            # 3. Background reporting
             history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
             analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
         else:
-            # Normal Socratic interaction
             st.session_state.chat_session.send_message(user_input)
             
         st.session_state.api_busy = False
         st.rerun()
 
     st.markdown("---")
-    if st.button("⏭️ Next Problem"):
+    if st.button("⏭️ Next Problem", use_container_width=False):
         st.session_state.last_id = None
         st.rerun()
