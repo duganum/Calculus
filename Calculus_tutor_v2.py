@@ -8,7 +8,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: UI consistency & Compact Chat
+# 2. CSS: Professional UI & LaTeX formatting
 st.markdown("""
     <style>
     div.stButton > button {
@@ -25,12 +25,8 @@ st.markdown("""
         border: 1px solid rgba(0,0,0,0.1);
         margin-bottom: 10px;
     }
-    .hint-container {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
-        border-left: 5px solid #ff4b4b;
-    }
+    /* Scannable layout adjustments */
+    .block-container { padding-top: 2rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -64,7 +60,7 @@ def draw_status():
 if st.session_state.user_name is None:
     st.title("🧮 Calculus AI Tutor Portal")
     with st.form("login_form"):
-        name_input = st.text_input("Full Name")
+        name_input = st.text_input("Enter Full Name")
         if st.form_submit_button("Access Tutor"):
             if name_input.strip():
                 st.session_state.user_name = name_input.strip()
@@ -75,7 +71,7 @@ if st.session_state.user_name is None:
 if st.session_state.page == "landing":
     draw_status()
     st.title(f"Welcome, {st.session_state.user_name}!")
-    st.info("Select a focus area for practice.")
+    st.info("Select a focus area to begin your Socratic practice.")
     
     col1, col2, col3, col4, col5 = st.columns(5)
     categories = [("Derivatives", "CAL_1"), ("Integrals", "CAL_2"), ("Partial Derivatives", "CAL_3"), ("Vector Analysis", "CAL_4"), ("Multiple Integrals", "CAL_5")]
@@ -86,7 +82,7 @@ if st.session_state.page == "landing":
                 cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
                 if cat_probs:
                     st.session_state.current_prob = random.choice(cat_probs)
-                    st.session_state.hint_history = [] # Reset hints for new problem
+                    st.session_state.hint_history = []
                     st.session_state.page = "chat"; st.rerun()
 
 # --- Page 2: Socratic Chat ---
@@ -100,17 +96,17 @@ elif st.session_state.page == "chat":
     cols = st.columns([1.5, 1])
     
     with cols[0]:
+        st.markdown("### Current Problem")
         st.info(prob['statement'])
         
         if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
-            sys_prompt = f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. Only one question at a time. Use LaTeX."
+            sys_prompt = f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. Only one targeted question at a time. ALWAYS use LaTeX for math (e.g., $x^2$)."
             st.session_state.chat_model = get_gemini_model(sys_prompt)
             st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-            start_msg = f"Hello {st.session_state.user_name}. What's the first thing you notice about this problem?"
+            start_msg = f"Hello {st.session_state.user_name}. Looking at this expression, what would be our first step in finding the derivative?"
             st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
             st.session_state.last_id = prob['id']
 
-        # Main Chat Window
         chat_box = st.container(height=400)
         with chat_box:
             for msg in st.session_state.chat_session.history:
@@ -120,7 +116,7 @@ elif st.session_state.page == "chat":
         if user_input := st.chat_input("Enter your step..."):
             st.session_state.api_busy = True
             if any(check_numeric_match(user_input, val) for val in prob['targets'].values()):
-                st.success("Correct!")
+                st.success("Correct! Excellent logic.")
                 history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
                 analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
             else:
@@ -130,26 +126,29 @@ elif st.session_state.page == "chat":
 
     with cols[1]:
         st.write("### 💡 Hint Mini-Chat")
-        # Compact hint display
-        hint_display = st.container(height=250, border=True)
+        hint_display = st.container(height=300, border=True)
         with hint_display:
             if not st.session_state.hint_history:
-                st.caption("Ask for an equation or concept here.")
+                st.caption("Need a specific derivative rule? Ask here.")
             for hint in st.session_state.hint_history:
-                role = "assistant" if hint['role'] == "model" else "user"
-                with st.chat_message(role):
+                with st.chat_message("assistant" if hint['role'] == "model" else "user"):
                     st.markdown(hint['text'])
         
-        # Mini-chat input
-        if h_input := st.chat_input("Ask for a hint (e.g. 'What is the Power Rule?')", key="hint_input"):
+        if h_input := st.chat_input("Ask for a rule or equation", key="hint_input"):
             st.session_state.hint_history.append({"role": "user", "text": h_input})
-            # Generate quick hint response
-            hint_model = get_gemini_model(f"Provide a brief, helpful mathematical hint or equation for: {prob['statement']}. No full solutions.")
+            # Force the hint model to use proper LaTeX and avoid HTML tags
+            hint_instruction = (
+                "Provide a concise math hint. Use ONLY LaTeX for formulas. "
+                "Example: Use $\\sec^2(x)$ instead of HTML tags. "
+                "Reference these if relevant: "
+                "$\\frac{d}{dx}[\\sin(x)] = \\cos(x)$, $\\frac{d}{dx}[\\tan(x)] = \\sec^2(x)$."
+            )
+            hint_model = get_gemini_model(hint_instruction)
             response = hint_model.generate_content(h_input)
             st.session_state.hint_history.append({"role": "model", "text": response.text})
             st.rerun()
 
         st.markdown("---")
-        if st.button("⏭️ New Problem", use_container_width=True):
+        if st.button("⏭️ Next Problem", use_container_width=True):
             st.session_state.last_id = None
             st.rerun()
