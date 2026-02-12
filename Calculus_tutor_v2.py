@@ -8,7 +8,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: Professional UI, Fix for the "Sliced" Badge, and Layout Constraints
+# 2. CSS: Professional UI & Layout Constraints
 st.markdown("""
     <style>
     div.stButton > button {
@@ -16,26 +16,18 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
-    .status-badge {
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: bold;
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid rgba(0,0,0,0.1);
-        margin-bottom: 15px;
-        margin-top: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
     .block-container { 
         padding-top: 1.5rem; 
-        max-width: 1000px; /* Constraints width for better readability on wide screens */
+        max-width: 1000px; 
     }
     h1 {
         margin-top: 5px !important;
         padding-top: 0px !important;
         font-size: 2rem !important;
+    }
+    /* Scannable info box */
+    .stAlert {
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -59,13 +51,6 @@ def get_text(msg):
         return msg.parts[0].text
     return msg.get('parts')[0].get('text')
 
-def draw_status():
-    status_container = st.container()
-    if st.session_state.api_busy:
-        status_container.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is reflecting...</div>', unsafe_allow_html=True)
-    else:
-        status_container.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Professor is Ready</div>', unsafe_allow_html=True)
-
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
     st.title("🧮 Calculus AI Tutor Portal")
@@ -79,7 +64,6 @@ if st.session_state.user_name is None:
 
 # --- Page 1: Main Menu ---
 if st.session_state.page == "landing":
-    draw_status()
     st.title(f"Welcome, {st.session_state.user_name}!")
     st.info("Select a focus area to begin your Socratic practice.")
     
@@ -103,7 +87,6 @@ if st.session_state.page == "landing":
 
 # --- Page 2: Socratic Chat ---
 elif st.session_state.page == "chat":
-    draw_status()
     prob = st.session_state.current_prob
     
     header_col1, header_col2 = st.columns([0.8, 0.2])
@@ -131,12 +114,11 @@ elif st.session_state.page == "chat":
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
-    # Chat history display - Reduced by 20% (500 -> 400)
+    # Chat history display - Height 400 for better screen visibility
     chat_box = st.container(height=400)
     with chat_box:
         for msg in st.session_state.chat_session.history:
             text = get_text(msg)
-            # Logic to keep internal AI instructions hidden from user UI
             if "HIDDEN_INSTRUCTION" not in text:
                 with st.chat_message(get_role(msg)):
                     st.markdown(text)
@@ -148,12 +130,10 @@ elif st.session_state.page == "chat":
         is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
         
         if is_correct:
-            # 1. Store user's final answer
             st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
-            # 2. Trigger hidden summary request
             hidden_prompt = f"HIDDEN_INSTRUCTION: The user is correct. Their answer was {user_input}. Congratulate them and provide a brief step-by-step summary."
             st.session_state.chat_session.send_message(hidden_prompt)
-            # 3. Background reporting
+            
             history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
             analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
         else:
