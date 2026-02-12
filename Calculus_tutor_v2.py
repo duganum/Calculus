@@ -7,9 +7,9 @@ import os
 from logic_v2_GitHub import get_gemini_model, check_numeric_match, analyze_and_send_report
 
 # 1. Page Configuration
-st.set_page_config(page_title="TAMUCC Engineering Economy Tutor", layout="wide")
+st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: Professional UI & Fix for Top Clipping
+# 2. CSS: Professional UI, Fix for Top Clipping, and Layout Consistency
 st.markdown("""
     <style>
     div.stButton > button {
@@ -17,6 +17,7 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
+    /* Fixed clipping by increasing top padding and normalizing margins */
     .block-container { 
         padding-top: 3.5rem !important; 
         max-width: 1000px; 
@@ -27,39 +28,43 @@ st.markdown("""
         font-size: 2rem !important;
         line-height: 1.2 !important;
     }
+    /* Aligns the chat input styling with the message container */
+    .stChatInput {
+        padding-bottom: 20px !important;
+    }
+    /* Scannable info box */
     .stAlert {
         margin-top: 10px;
         margin-bottom: 10px;
     }
-    .stChatInput {
-        padding-bottom: 20px !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Initialize Session State
+# 3. Load Calculus Problems (Verified against File System)
+@st.cache_data
+def load_calculus_data():
+    # Use the EXACT filename from your repository: calculus_problems.json
+    file_name = 'calculus_problems.json'
+    
+    try:
+        with open(file_name, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # Fallback to absolute path check for Streamlit Cloud environment
+        base_path = os.path.dirname(__file__)
+        full_path = os.path.join(base_path, file_name)
+        with open(full_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+PROBLEMS = load_calculus_data()
+
+# 4. Initialize Session State
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "user_name" not in st.session_state: st.session_state.user_name = None
 if "current_prob" not in st.session_state: st.session_state.current_prob = None
 if "last_id" not in st.session_state: st.session_state.last_id = None
 if "api_busy" not in st.session_state: st.session_state.api_busy = False
 if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = None
-
-# 4. Load Engineering Economics Problems
-@st.cache_data
-def load_engineering_economics_data():
-    # Matching the filename from your GitHub filesystem exactly
-    file_name = 'Eng_Economics_problems.json'
-    try:
-        with open(file_name, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        base_path = os.path.dirname(__file__)
-        full_path = os.path.join(base_path, file_name)
-        with open(full_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
-PROBLEMS = load_engineering_economics_data()
 
 # --- Helper Logic ---
 def get_role(msg):
@@ -73,7 +78,7 @@ def get_text(msg):
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
-    st.title("💰 Engineering Economy AI Tutor")
+    st.title("🧮 Calculus AI Tutor Portal")
     with st.form("login_form"):
         name_input = st.text_input("Enter Full Name")
         if st.form_submit_button("Access Tutor"):
@@ -89,11 +94,11 @@ if st.session_state.page == "landing":
     
     col1, col2, col3, col4, col5 = st.columns(5)
     categories = [
-        ("Time Value of Money", "EngEco_1"),
-        ("Comparison of Alternatives", "EngEco_2"),
-        ("Cost/Financial Analysis", "EngEco_3"),
-        ("Risk & Uncertainty", "EngEco_4"),
-        ("Specialized Apps", "EngEco_5")
+        ("Derivatives", "CAL_1"),
+        ("Integrals", "CAL_2"),
+        ("Partial Derivatives", "CAL_3"),
+        ("Vector Analysis", "CAL_4"),
+        ("Multiple Integrals", "CAL_5")
     ]
     
     cols = [col1, col2, col3, col4, col5]
@@ -107,7 +112,7 @@ if st.session_state.page == "landing":
                     st.session_state.page = "chat"
                     st.rerun()
             
-            # Lecture Button (Restored below each category)
+            # Lecture Button (Explicitly added for all categories)
             if st.button(f"🎓 Lecture", key=f"lec_{prefix}", use_container_width=True):
                 st.session_state.lecture_topic = name
                 st.session_state.page = "lecture"
@@ -129,16 +134,17 @@ elif st.session_state.page == "chat":
     
     if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
         sys_prompt = (
-            f"You are an Engineering Economy Professor. Help solve: {prob['statement']}. "
-            "Ask ONE targeted question at a time. ALWAYS use LaTeX for math/factors. "
-            "If the student provides the correct answer, congratulate them and provide a brief summary."
+            f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. "
+            "Ask ONE targeted question at a time. ALWAYS use LaTeX for math (e.g., $x^2$). "
+            "If the student is correct, congratulate them and provide a brief step-by-step summary."
         )
         st.session_state.chat_model = get_gemini_model(sys_prompt)
         st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-        start_msg = f"Hello {st.session_state.user_name}. Looking at this problem, what is the first parameter we need to identify?"
+        start_msg = f"Hello {st.session_state.user_name}. Looking at this expression, what would be our first step?"
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
+    # Aligned chat container
     chat_container = st.container()
     with chat_container:
         chat_box = st.container(height=400)
@@ -167,8 +173,8 @@ elif st.session_state.page == "chat":
 
     st.markdown("---")
     if st.button("⏭️ Next Problem"):
-        prefix = prob['id'].rsplit('_', 1)[0]
-        cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
+        current_prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
+        cat_probs = [p for p in PROBLEMS if p['id'].startswith(current_prefix)]
         if cat_probs:
             remaining = [p for p in cat_probs if p['id'] != prob['id']]
             st.session_state.current_prob = random.choice(remaining if remaining else cat_probs)
@@ -183,15 +189,15 @@ elif st.session_state.page == "lecture":
     
     with col_content:
         st.write(f"### Understanding {topic}")
-        st.markdown(f"In this module, we explore the fundamental principles of **{topic}** required for the FE Exam.")
+        st.markdown(f"In this module, we explore the fundamental principles of **{topic}** required for your calculus progress.")
         if st.button("Back to Menu"):
             st.session_state.page = "landing"
             st.rerun()
 
     with col_tutor:
-        st.subheader("💬 Ask Professor Um")
+        st.subheader("💬 Ask the Professor")
         if "lec_session" not in st.session_state:
-            model = get_gemini_model(f"You are Prof. Um teaching {topic}. Lead the student with Socratic questions.")
+            model = get_gemini_model(f"You are a Calculus Professor teaching {topic}. Lead the student with Socratic questions.")
             st.session_state.lec_session = model.start_chat(history=[])
         
         for msg in st.session_state.lec_session.history:
