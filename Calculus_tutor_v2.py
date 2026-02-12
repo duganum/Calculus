@@ -16,7 +16,6 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
-    /* Fixed clipping by increasing top padding and normalizing margins */
     .block-container { 
         padding-top: 3.5rem !important; 
         max-width: 1000px; 
@@ -27,12 +26,10 @@ st.markdown("""
         font-size: 2rem !important;
         line-height: 1.2 !important;
     }
-    /* Ensure info boxes don't crowd the header */
     .stAlert {
         margin-top: 10px;
         margin-bottom: 10px;
     }
-    /* Remove default pinning margins for inline chat_input */
     .stChatInput {
         padding-bottom: 20px !important;
     }
@@ -121,7 +118,6 @@ elif st.session_state.page == "chat":
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
-    # Chat history display & Input aligned in the same parent container
     chat_container = st.container()
     with chat_container:
         chat_box = st.container(height=400)
@@ -132,10 +128,8 @@ elif st.session_state.page == "chat":
                     with st.chat_message(get_role(msg)):
                         st.markdown(text)
 
-        # Placing chat_input here (inside the container) aligns its width with the container above
         if user_input := st.chat_input("Enter your step..."):
             st.session_state.api_busy = True
-            
             is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
             
             if is_correct:
@@ -152,6 +146,15 @@ elif st.session_state.page == "chat":
             st.rerun()
 
     st.markdown("---")
-    if st.button("⏭️ Next Problem", use_container_width=False):
+    if st.button("⏭️ Next Problem"):
+        # Fix: Extract prefix from current ID and pick a new random problem from that category
+        current_prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
+        cat_probs = [p for p in PROBLEMS if p['id'].startswith(current_prefix)]
+        
+        if cat_probs:
+            # Optionally filter out the current problem so it doesn't repeat immediately
+            remaining_probs = [p for p in cat_probs if p['id'] != prob['id']]
+            st.session_state.current_prob = random.choice(remaining_probs if remaining_probs else cat_probs)
+        
         st.session_state.last_id = None
         st.rerun()
