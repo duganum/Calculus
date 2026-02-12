@@ -28,10 +28,7 @@ st.markdown("""
         margin-top: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    /* Scannable layout adjustments */
     .block-container { padding-top: 2rem; }
-    
-    /* Ensure title has clear spacing from elements above */
     h1 {
         margin-top: 10px !important;
         padding-top: 0px !important;
@@ -117,7 +114,14 @@ elif st.session_state.page == "chat":
     st.info(prob['statement'])
     
     if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
-        sys_prompt = f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. Only one targeted question at a time. ALWAYS use LaTeX for math (e.g., $x^2$). If the user asks for a hint, provide a small conceptual nudge using LaTeX."
+        # Updated system prompt to strictly guide the model
+        sys_prompt = (
+            f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. "
+            "Ask ONLY one targeted question at a time to lead the student. "
+            "ALWAYS use LaTeX for math (e.g., $x^2$). "
+            "If the student provides the final correct answer, provide a warm congratulations "
+            "and a concise summary of the steps, then STOP asking questions for this problem."
+        )
         st.session_state.chat_model = get_gemini_model(sys_prompt)
         st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
         start_msg = f"Hello {st.session_state.user_name}. Looking at this expression, what would be our first step?"
@@ -128,23 +132,30 @@ elif st.session_state.page == "chat":
     chat_box = st.container(height=500)
     with chat_box:
         for msg in st.session_state.chat_session.history:
-            with st.chat_message(get_role(msg)):
-                st.markdown(get_text(msg))
+            # We skip internal hidden instructions to prevent "AI talking to itself"
+            text = get_text(msg)
+            if "HIDDEN_INSTRUCTION" not in text:
+                with st.chat_message(get_role(msg)):
+                    st.markdown(text)
 
     # User Input Logic
-    if user_input := st.chat_input("Enter your step or ask for a hint..."):
+    if user_input := st.chat_input("Enter your step..."):
         st.session_state.api_busy = True
         
         # Check if user input matches target numerical answers
         is_correct = any(check_numeric_match(user_input, val) for val in prob['targets'].values())
         
         if is_correct:
-            st.success("Correct! Excellent logic.")
-            # Record final history and report
+            # 1. Add the user's actual text to history
+            st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
+            
+            # 2. Send a hidden instruction for the summary without displaying it in the UI
+            hidden_prompt = f"HIDDEN_INSTRUCTION: The user is correct. Their answer was {user_input}. Congratulate them and provide a brief step-by-step summary."
+            st.session_state.chat_session.send_message(hidden_prompt)
+            
+            # 3. Finalize reporting
             history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
             analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
-            # Send message to model to congratulate/wrap up
-            st.session_state.chat_session.send_message(f"I found the correct answer: {user_input}. Please congratulate me and offer a brief summary.")
         else:
             # Normal Socratic interaction
             st.session_state.chat_session.send_message(user_input)
