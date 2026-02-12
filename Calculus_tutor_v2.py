@@ -8,7 +8,7 @@ from logic_v2_GitHub import get_gemini_model, load_problems, check_numeric_match
 # 1. Page Configuration
 st.set_page_config(page_title="TAMUCC Calculus Tutor", layout="wide")
 
-# 2. CSS: Professional UI & Layout Constraints
+# 2. CSS: Professional UI & Fix for Top Clipping
 st.markdown("""
     <style>
     div.stButton > button {
@@ -16,17 +16,20 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
+    /* Fixed clipping by increasing top padding and normalizing margins */
     .block-container { 
-        padding-top: 1.5rem; 
+        padding-top: 3.5rem !important; 
         max-width: 1000px; 
     }
     h1 {
-        margin-top: 5px !important;
+        margin-top: 0px !important;
         padding-top: 0px !important;
         font-size: 2rem !important;
+        line-height: 1.2 !important;
     }
-    /* Scannable info box */
+    /* Ensure info boxes don't crowd the header */
     .stAlert {
+        margin-top: 10px;
         margin-bottom: 10px;
     }
     </style>
@@ -89,6 +92,7 @@ if st.session_state.page == "landing":
 elif st.session_state.page == "chat":
     prob = st.session_state.current_prob
     
+    # Header layout with proper alignment
     header_col1, header_col2 = st.columns([0.8, 0.2])
     with header_col1:
         st.title("📝 Problem Practice")
@@ -114,7 +118,7 @@ elif st.session_state.page == "chat":
         st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
         st.session_state.last_id = prob['id']
 
-    # Chat history display - Height 400 for better screen visibility
+    # Chat history display - height 400 for compact visibility
     chat_box = st.container(height=400)
     with chat_box:
         for msg in st.session_state.chat_session.history:
