@@ -54,9 +54,9 @@ def get_text(msg):
 # --- Helper: Activity Indicator ---
 def draw_status():
     if st.session_state.api_busy:
-        st.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Professor is Reflecting...</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge" style="background-color: #ff4b4b; color: white;">🔴 Processing...</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Professor is Ready</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge" style="background-color: #28a745; color: white;">🟢 Ready</div>', unsafe_allow_html=True)
 
 # --- Page 0: Login ---
 if st.session_state.user_name is None:
@@ -118,12 +118,11 @@ elif st.session_state.page == "chat":
                           f"Solve: {prob['statement']}. Socratic method only. Use LaTeX.")
             st.session_state.chat_model = get_gemini_model(sys_prompt)
             st.session_state.chat_session = st.session_state.chat_model.start_chat(history=[])
-            # Manual append to start the conversation safely
             start_msg = f"Hello {st.session_state.user_name}. To begin, how would you approach the first derivative/integral of this function?"
             st.session_state.chat_session.history.append({"role": "model", "parts": [{"text": start_msg}]})
             st.session_state.last_id = prob['id']
 
-        # Loop through history using safe helpers
+        # Rendering History
         for msg in st.session_state.chat_session.history:
             with st.chat_message(get_role(msg)):
                 st.markdown(get_text(msg))
@@ -137,26 +136,19 @@ elif st.session_state.page == "chat":
                 history_text = "".join([f"{'Tutor' if get_role(m)=='assistant' else 'Student'}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
                 analyze_and_send_report(st.session_state.user_name, f"SUCCESS: {prob['id']}", history_text)
                 st.session_state.api_busy = False
-                if st.button("Next Problem ➡️"): st.rerun()
+                # User manually clicks home or next problem
             else:
-                try:
-                    with st.spinner("Professor is reflecting..."):
-                        st.session_state.chat_session.send_message(user_input)
-                    st.session_state.api_busy = False
-                    st.rerun()
-                except Exception as e:
-                    st.error("Rate limit reached. Please wait 10 seconds.")
-                    time.sleep(2)
-                    st.session_state.api_busy = False
+                # RAW CALL - NO ERROR HANDLING
+                st.session_state.chat_session.send_message(user_input)
+                st.session_state.api_busy = False
+                st.rerun()
 
     with cols[1]:
         st.write("### Tutor Tools")
         if st.button("Get a Hint", use_container_width=True):
-            try:
-                st.session_state.chat_session.send_message("I'm stuck. Can you guide me to the next step?")
-                st.rerun()
-            except:
-                st.warning("Rate limit reached. Please wait.")
+            # RAW CALL - NO ERROR HANDLING
+            st.session_state.chat_session.send_message("I'm stuck. Can you guide me to the next step?")
+            st.rerun()
 
 # --- Page 3: Interactive Lecture ---
 elif st.session_state.page == "lecture":
@@ -167,7 +159,7 @@ elif st.session_state.page == "lecture":
     
     with col_content:
         st.write(f"### Fundamental Concepts of {topic}")
-        st.info("Ask the Professor to explain specific steps or conceptual origins.")
+        st.info("Review conceptual origins. Ask the Professor for clarification.")
         if st.button("Back to Menu", use_container_width=True):
             st.session_state.page = "landing"; st.rerun()
 
@@ -178,14 +170,12 @@ elif st.session_state.page == "lecture":
             st.session_state.lec_session = model.start_chat(history=[])
             st.session_state.lec_session.history.append({"role": "model", "parts": [{"text": f"Hello {st.session_state.user_name}. What is your current understanding of {topic}?"}]})
         
-        # Loop through lecture history using safe helpers
+        # Rendering History
         for msg in st.session_state.lec_session.history:
             with st.chat_message(get_role(msg)):
                 st.markdown(get_text(msg))
         
         if lec_input := st.chat_input("Ask about the concept..."):
-            try:
-                st.session_state.lec_session.send_message(lec_input)
-                st.rerun()
-            except:
-                st.error("Rate limit reached. Try again in a few seconds.")
+            # RAW CALL - NO ERROR HANDLING
+            st.session_state.lec_session.send_message(lec_input)
+            st.rerun()
