@@ -48,6 +48,7 @@ if "lecture_topic" not in st.session_state: st.session_state.lecture_topic = Non
 # 4. Load Engineering Economics Problems
 @st.cache_data
 def load_engineering_economics_data():
+    # Matching the filename from your GitHub filesystem exactly
     file_name = 'Eng_Economics_problems.json'
     try:
         with open(file_name, 'r', encoding='utf-8') as f:
@@ -84,7 +85,7 @@ if st.session_state.user_name is None:
 # --- Page 1: Main Menu ---
 if st.session_state.page == "landing":
     st.title(f"Welcome, {st.session_state.user_name}!")
-    st.info("Select a category to start practice or view a lecture.")
+    st.info("Select a focus area to begin your Socratic practice.")
     
     col1, col2, col3, col4, col5 = st.columns(5)
     categories = [
@@ -99,15 +100,15 @@ if st.session_state.page == "landing":
     for i, (name, prefix) in enumerate(categories):
         with cols[i]:
             # Practice Button
-            if st.button(f"📘 Practice {name}", key=f"cat_{prefix}", use_container_width=True):
+            if st.button(f"📘 {name}", key=f"cat_{prefix}", use_container_width=True):
                 cat_probs = [p for p in PROBLEMS if p['id'].startswith(prefix)]
                 if cat_probs:
                     st.session_state.current_prob = random.choice(cat_probs)
                     st.session_state.page = "chat"
                     st.rerun()
             
-            # Lecture Button (Restored for each category)
-            if st.button(f"🎓 Lecture: {name}", key=f"lec_{prefix}", use_container_width=True):
+            # Lecture Button (Restored below each category)
+            if st.button(f"🎓 Lecture", key=f"lec_{prefix}", use_container_width=True):
                 st.session_state.lecture_topic = name
                 st.session_state.page = "lecture"
                 st.rerun()
