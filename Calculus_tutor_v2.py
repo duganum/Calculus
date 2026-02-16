@@ -168,9 +168,19 @@ elif st.session_state.page == "chat":
     
     if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
         sys_prompt = (
-            f"You are a Socratic Calculus Tutor. Solve: {prob['statement']}. "
-            "Ask ONE targeted question at a time. ALWAYS use LaTeX for math. "
-            "Do not provide direct answers. Guide the student step-by-step."
+            f"You are a Socratic Calculus Tutor at TAMUCC. "
+            f"REFERENCE DATA: {prob['statement']}. "
+            "### CORE INSTRUCTIONS:\n"
+            "1. LITERAL SOURCE OF TRUTH: Use the provided REFERENCE DATA as the absolute authority. "
+            "If the problem specifies non-standard variables, specific interval bounds, or unique "
+            "geometric constraints, do not 'correct' them to general conventions. Accept the student's "
+            "math if it aligns with this specific problem text.\n"
+            "2. VALIDATION BEFORE CRITIQUE: Before telling a student they are wrong, re-read the "
+            "REFERENCE DATA. Check if their approach matches the specific parameters defined there "
+            "rather than a general formula.\n"
+            "3. SOCRATIC METHOD: Ask ONE targeted question at a time to guide the student through "
+            "the derivation or solution. Do not provide direct answers or full steps immediately.\n"
+            "4. MATHEMATICAL PRECISION: ALWAYS use LaTeX for all math expressions and formulas."
         )
         try:
             st.session_state.chat_model = get_gemini_model(sys_prompt)
@@ -278,3 +288,4 @@ elif st.session_state.page == "lecture":
             except Exception as e:
                 st.session_state.api_busy = False
                 st.error(f"Error: {e}")
+
