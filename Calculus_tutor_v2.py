@@ -18,8 +18,9 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
+    /* Fixed clipping by increasing top padding and normalizing margins */
     .block-container { 
-        padding-top: 2rem !important; 
+        padding-top: 1.5rem !important; 
         max-width: 1100px; 
     }
     .status-badge {
@@ -29,7 +30,7 @@ st.markdown("""
         font-weight: bold;
         display: inline-block;
         border: 1px solid rgba(0,0,0,0.1);
-        margin-top: 10px;
+        margin-top: 5px;
     }
     h1 {
         margin-top: 0px !important;
@@ -97,7 +98,7 @@ if st.session_state.user_name is None:
                 st.rerun()
     st.stop()
 
-# --- Page 1: Main Menu (Unified Layout) ---
+# --- Page 1: Main Menu ---
 if st.session_state.page == "landing":
     draw_header_with_status(f"Welcome, {st.session_state.user_name}!")
     st.info("Select a focus area to begin your Socratic practice.")
