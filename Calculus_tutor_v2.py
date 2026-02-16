@@ -18,9 +18,9 @@ st.markdown("""
         font-size: 14px;
         font-weight: bold;
     }
-    /* INCREASED PADDING to prevent top clipping and ensure visibility */
+    /* INCREASED PADDING further to ensure top visibility and fix clipping */
     .block-container { 
-        padding-top: 5rem !important; 
+        padding-top: 6rem !important; 
         max-width: 1100px; 
     }
     .status-badge {
@@ -30,10 +30,10 @@ st.markdown("""
         font-weight: bold;
         display: inline-block;
         border: 1px solid rgba(0,0,0,0.1);
-        margin-top: 15px; /* Added margin to push badge down */
+        margin-top: 5px !important;
     }
     h1 {
-        margin-top: 10px !important;
+        margin-top: 0px !important;
         padding-top: 0px !important;
         font-size: 2.2rem !important;
         line-height: 1.2 !important;
