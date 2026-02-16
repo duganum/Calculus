@@ -149,9 +149,22 @@ elif st.session_state.page == "chat":
     with col_info:
         st.markdown(f"**Category:** {prob['category']}")
         st.info(prob['statement'])
-        if st.button("🏠 Exit to Main", use_container_width=True):
-            st.session_state.page = "landing"
-            st.rerun()
+        
+        st.divider()
+        st.subheader("📝 Session Analysis")
+        feedback = st.text_area("Notes for Dr. Um:", placeholder="How do you feel about this concept?", height=100)
+        
+        if st.button("🚀 Submit Session", use_container_width=True):
+            if "chat_session" in st.session_state:
+                history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
+                with st.spinner("Analyzing mastery..."):
+                    analyze_and_send_report(st.session_state.user_name, f"Calculus: {prob['id']}", f"History:\n{history_text}\nFeedback: {feedback}")
+                    st.success("Analysis sent to dugan.um@gmail.com")
+                    time.sleep(2)
+                    st.session_state.page = "landing"; st.rerun()
+
+        if st.button("🏠 Exit without Submitting", use_container_width=True):
+            st.session_state.page = "landing"; st.rerun()
     
     if "chat_session" not in st.session_state or st.session_state.last_id != prob['id']:
         sys_prompt = (
@@ -188,8 +201,6 @@ elif st.session_state.page == "chat":
                     st.session_state.chat_session.history.append({"role": "user", "parts": [{"text": user_input}]})
                     hidden_prompt = f"HIDDEN_INSTRUCTION: Correct was {user_input}. Congratulate and summarize steps."
                     st.session_state.chat_session.send_message(hidden_prompt)
-                    history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.chat_session.history])
-                    analyze_and_send_report(st.session_state.user_name, f"Calculus Success: {prob['id']}", history_text)
                 else:
                     st.session_state.chat_session.send_message(user_input)
                 
@@ -202,7 +213,6 @@ elif st.session_state.page == "chat":
                 st.session_state.api_busy = False
                 st.error(f"Connection Pause: {e}")
 
-    st.markdown("---")
     if st.button("⏭️ Next Problem"):
         current_prefix = prob['id'].split('_')[0] + "_" + prob['id'].split('_')[1]
         cat_probs = [p for p in PROBLEMS if p['id'].startswith(current_prefix)]
@@ -216,15 +226,27 @@ elif st.session_state.page == "chat":
 elif st.session_state.page == "lecture":
     topic = st.session_state.lecture_topic
     draw_header_with_status(f"🎓 Lecture: {topic}")
-    col_content, col_tutor = st.columns([1, 1])
+    col_content, col_tutor = st.columns([1, 1.2])
     
     with col_content:
         st.write(f"### Understanding {topic}")
-        st.markdown(f"In this module, we explore the fundamental principles of **{topic}** required for your calculus progress.")
+        st.markdown(f"In this module, we explore the fundamental principles of **{topic}**.")
+        
+        st.divider()
+        st.subheader("📝 Session Analysis")
+        lec_feedback = st.text_area("Final thoughts:", placeholder="What part was most confusing?", height=100)
+        
+        if st.button("🚀 Submit Lecture Session", use_container_width=True):
+            if "lec_session" in st.session_state:
+                history_text = "".join([f"{get_role(m)}: {get_text(m)}\n" for m in st.session_state.lec_session.history])
+                with st.spinner("Submitting..."):
+                    analyze_and_send_report(st.session_state.user_name, f"LECTURE: {topic}", f"History:\n{history_text}\nFeedback: {lec_feedback}")
+                    st.success("Report emailed to Dr. Um!")
+                    time.sleep(2)
+                    st.session_state.page = "landing"; st.rerun()
+
         if st.button("🏠 Exit to Main", use_container_width=True):
-            if "lec_session" in st.session_state: del st.session_state.lec_session
-            st.session_state.page = "landing"
-            st.rerun()
+            st.session_state.page = "landing"; st.rerun()
 
     with col_tutor:
         st.subheader("💬 Ask the Professor")
@@ -252,7 +274,7 @@ elif st.session_state.page == "lecture":
                 st.rerun()
             except exceptions.ResourceExhausted:
                 st.session_state.api_busy = False
-                st.error("Professor is thinking deeply (Rate Limit). Please wait a moment.")
+                st.error("Rate Limit reached.")
             except Exception as e:
                 st.session_state.api_busy = False
                 st.error(f"Error: {e}")
