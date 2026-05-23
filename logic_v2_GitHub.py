@@ -7,12 +7,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 def get_gemini_model(system_instruction):
-    """Gemini 2.0 Flash 모델을 초기화합니다."""
+    """Gemini 2.5 Flash 모델을 초기화합니다."""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         return genai.GenerativeModel(
-            model_name='models/gemini-2.0-flash', 
+            model_name='models/gemini-2.5-flash', 
             system_instruction=system_instruction
         )
     except Exception as e:
